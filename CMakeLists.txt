@@ -62,9 +62,14 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 # additional compile options
 option(EMBEDDING_USE_ASSERTIONS "Explicitely activates assertions (even in release mode)." OFF)
+option(ENABLE_SPATIAL_LOGGING "Enable logging of spatial queries" ON)
 if(EMBEDDING_USE_ASSERTIONS)
         add_compile_definitions(EMBEDDING_USE_ASSERTIONS)
 endif(EMBEDDING_USE_ASSERTIONS)
+
+if(ENABLE_SPATIAL_LOGGING)
+    add_compile_definitions(ENABLE_SPATIAL_LOGGING)
+endif(ENABLE_SPATIAL_LOGGING)
 
 enable_testing()
 

@@ -9,6 +9,7 @@
 #include "Optimizer.hpp"
 #include "Timings.hpp"
 #include "VecList.hpp"
+#include "SpatialQueryLogger.hpp"
 
 /**
  * Abstract class that represents a generic force directed algorithm.
@@ -32,13 +33,17 @@ class AbstractSimpleEmbedder : public EmbedderInterface {
           oldWeights(g.getNumVertices()),
           newWeights(g.getNumVertices()),
           currentWeightForce(g.getNumVertices()) {
+        LOG_SPATIAL_INIT("spatial_log");
         setWeights(AbstractSimpleEmbedder::rescaleWeights(opts.dimensionHint, opts.embeddingDimension,
                                                         constructDegreeWeights(g)));
+        
         setCoordinates(constructRandomCoordinates(opts.embeddingDimension, g.getNumVertices()));
         initializeOptimizer();
     };
 
-    virtual ~AbstractSimpleEmbedder() {};
+    virtual ~AbstractSimpleEmbedder() {
+     LOG_SPATIAL_CLOSE();
+    };
 
     virtual void calculateStep();
     virtual void calculateEmbedding();

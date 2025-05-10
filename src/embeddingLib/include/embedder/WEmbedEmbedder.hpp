@@ -7,6 +7,7 @@
 #include "Timings.hpp"
 #include "VecList.hpp"
 #include "WeightedRTree.hpp"
+#include "SpatialQueryLogger.hpp"
 
 class WEmbedEmbedder : public EmbedderInterface {
     using Timer = util::Timer;
@@ -24,6 +25,7 @@ class WEmbedEmbedder : public EmbedderInterface {
           currentWeights(g.getNumVertices()) {
         // Initialize coordinates randomly and weights based on degree
         setCoordinates(WEmbedEmbedder::constructRandomCoordinates(opts.embeddingDimension, g.getNumVertices()));
+        LOG_SPATIAL_INIT("spatial_log");
         if (opts.weightType == WeightType::Degree) {
             setWeights(WEmbedEmbedder::rescaleWeights(opts.dimensionHint, opts.embeddingDimension,
                                                       WEmbedEmbedder::constructDegreeWeights(g)));

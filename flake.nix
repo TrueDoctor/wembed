@@ -29,22 +29,17 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
         python = pkgs.python3;
-      in
-      {
-        packages.default = pkgs.stdenv.mkDerivation {
-          pname = "wembed";
-          version = "0.0.1";
 
+        # Common build inputs and setup for both library and full package
+        commonArgs = {
+          version = "0.0.1";
           src = ./.;
 
           nativeBuildInputs = with pkgs; [
             cmake
             ninja
             pkg-config
-            python3
             git
-            python3.pkgs.scikit-build-core
-            python3.pkgs.pybind11
           ];
 
           buildInputs = with pkgs; [
@@ -72,17 +67,6 @@
             "-DFETCHCONTENT_SOURCE_DIR_GIRGS=${girgs}"
             "-DFETCHCONTENT_SOURCE_DIR_PYBIND11=${pybind11}"
           ];
-
-          # Handle Python packaging
-          postInstall = ''
-            # Ensure Python package is installed correctly
-            export PYTHONPATH="$out/${python.sitePackages}:$PYTHONPATH"
-            
-            # Make the CLI executable available
-            mkdir -p $out/bin
-            cp bin/cli_wembed $out/bin/wembed
-            chmod +x $out/bin/wembed
-          '';
 
           meta = with pkgs.lib; {
             description = "Calculate low dimensional weighted node embeddings";
@@ -112,11 +96,66 @@
             ];
           };
         };
+      in
+      {
+        packages = {
+          # Library only package
+          lib = pkgs.stdenv.mkDerivation (commonArgs // {
+            pname = "libwembed";
+            
+            cmakeFlags = commonArgs.cmakeFlags ++ [
+              "-DBUILD_SHARED_LIBS=ON"
+            ];
+
+            # Install only the library components
+            postInstall = ''
+              mkdir -p $out/lib
+              cp lib/libwembed*.so* $out/lib/
+              cp -r include $out/
+            '';
+          });
+
+          # Full package with CLI and Python bindings
+          full = pkgs.stdenv.mkDerivation (commonArgs // {
+            pname = "wembed";
+
+            nativeBuildInputs = commonArgs.nativeBuildInputs ++ (with pkgs; [
+              python3
+              python3.pkgs.scikit-build-core
+              python3.pkgs.pybind11
+            ]);
+
+            # Install everything including CLI and Python bindings
+            postInstall = ''
+              # Ensure Python package is installed correctly
+              export PYTHONPATH="$out/${python.sitePackages}:$PYTHONPATH"
+              
+              # Make the CLI executable available
+              mkdir -p $out/bin
+              cp bin/cli_wembed $out/bin/wembed
+              # Currently disabled due to broken python build
+              # cp bin/cli_python_example $out/bin/wembed-python
+              chmod +x $out/bin/wembed
+              # Currently disabled due to broken python build
+              # chmod +x $out/bin/wembed-python
+            '';
+          });
+
+          # Set default package to the full version
+          default = self.packages.${system}.full;
+        };
 
         # Add apps to make the CLIs directly runnable
-        apps.default = flake-utils.lib.mkApp {
-          drv = self.packages.${system}.default;
-          name = "wembed";
+        apps = {
+          default = flake-utils.lib.mkApp {
+            drv = self.packages.${system}.full;
+            name = "wembed";
+          };
+
+          python = flake-utils.lib.mkApp {
+            drv = self.packages.${system}.full;
+            name = "wembed-python";
+          };
         };
 
         devShells.default = pkgs.mkShell {
@@ -145,6 +184,7 @@
             valgrind
             ccache
             clang-tools # For clang-format, clang-tidy
+            gnuplot
             pre-commit
 
             # Additional Python development tools

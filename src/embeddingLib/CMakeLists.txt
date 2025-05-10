@@ -27,6 +27,7 @@ set(HEADERS
         # Embedder
         #include/embedder/EmbedderFactory.hpp
         include/embedder/EmbedderOptions.hpp
+        include/embedder/SpatialQueryLogger.hpp
 
         include/embedder/AbstractSimpleEmbedder.hpp
         #include/embedder/AbstractLayerEmbedder.hpp
@@ -92,6 +93,7 @@ set(SOURCES
         src/embedder/SimpleSamplingEmbedder.cpp
         src/embedder/WEmbedEmbedder.cpp
         src/embedder/LayeredEmbedder.cpp
+        src/embedder/SpatialQueryLogger.cpp
 
         src/gradientOptimizer/AdamOptimizer.cpp
         src/gradientOptimizer/SimpleOptimizer.cpp

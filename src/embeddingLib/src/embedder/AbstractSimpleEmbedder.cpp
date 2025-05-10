@@ -7,6 +7,7 @@
 #include "AdamOptimizer.hpp"
 #include "Graph.hpp"
 #include "SimpleOptimizer.hpp"
+#include "SpatialQueryLogger.hpp"
 
 Graph AbstractSimpleEmbedder::getCurrentGraph() { return graph.getGraph(); }
 
@@ -72,6 +73,8 @@ void AbstractSimpleEmbedder::calculateEmbedding() {
 }
 
 void AbstractSimpleEmbedder::calculateStep() {
+    LOG_SPATIAL_ITERATION(currIteration);
+  
     if (insignificantPosChange && !options.staticWeights) {
         insignificantPosChange = false;
         calculateWeightStep();
@@ -79,6 +82,7 @@ void AbstractSimpleEmbedder::calculateStep() {
         calculateForceStep();
     }
 
+    // LOG_SPATIAL_POSITIONS(currentPositions.convertToVector(), getWeights());
     currIteration++;
 }
 

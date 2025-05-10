@@ -1,4 +1,5 @@
 #include "WeightedRTree.hpp"
+#include "SpatialQueryLogger.hpp"
 
 #include <iostream>
 
@@ -85,6 +86,7 @@ int WeightedRTree::getNumWeightClasses() const { return maxWeightOfClass.size();
 
 void WeightedRTree::getKNNNeighbors(const RTree& rtree, CVecRef p, int k, std::vector<NodeId>& output) const {
     ASSERT(p.dimension() == DIMENSION);
+    LOG_SPATIAL_QUERY_NEAREST(p, k);
     rtree.query_nearest(p, k, output);
 }
 
@@ -100,6 +102,7 @@ void WeightedRTree::getWithinRadius(const RTree& rtree, CVecRef p, double radius
         min_corner[i] -= radius;
         max_corner[i] += radius;
     }
+    LOG_SPATIAL_QUERY_SPHERE(min_corner.erase(), max_corner.erase(), p, radius); 
     rtree.query_sphere(min_corner.erase(), max_corner.erase(), p, radius, output);
 }
 
@@ -115,5 +118,6 @@ void WeightedRTree::getWithinBox(const RTree& rtree, CVecRef p, double radius, s
         min_corner[i] -= radius;
         max_corner[i] += radius;
     }
+    LOG_SPATIAL_QUERY_BOX(min_corner.erase(), max_corner.erase());
     rtree.query_box(min_corner.erase(), max_corner.erase(), output);
 }
