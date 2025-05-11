@@ -1,6 +1,7 @@
 use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 use std::path::Path;
+mod graph;
 
 #[derive(Debug)]
 struct Position {
@@ -8,7 +9,6 @@ struct Position {
     weight: f64,
     coordinates: Vec<f64>,
 }
-
 
 #[derive(Debug)]
 struct Iteration {
@@ -28,28 +28,29 @@ fn parse_positions_file<P: AsRef<Path>>(path: P) -> io::Result<Vec<Iteration>> {
             if let Some(iter) = current_iteration.take() {
                 iterations.push(iter);
             }
-            
-            let num = line.split_whitespace()
+
+            let num = line
+                .split_whitespace()
                 .nth(1)
                 .and_then(|s| s.parse::<usize>().ok())
                 .unwrap_or(0);
-                
+
             current_iteration = Some(Iteration {
                 number: num,
                 positions: Vec::new(),
             });
-        } else if line.contains("---") {
+        } else if line.contains("---") || line.split_whitespace().count() == 2 {
             // End of positions block
             continue;
         } else if let Some(ref mut iter) = current_iteration {
             let parts: Vec<&str> = line.split_whitespace().collect();
-            
+
             if parts.len() >= 2 && parts[1].parse::<f64>().is_ok() {
                 // This is a position line
                 let index = parts[0].parse::<usize>().unwrap_or(0);
                 let weight = parts[1].parse::<f64>().unwrap_or(0.0);
                 let dim = parts[2].parse::<usize>().unwrap_or(0);
-                
+
                 let mut coordinates = Vec::with_capacity(dim);
                 for i in 0..dim {
                     if let Some(val) = parts.get(3 + i) {
@@ -58,7 +59,7 @@ fn parse_positions_file<P: AsRef<Path>>(path: P) -> io::Result<Vec<Iteration>> {
                         }
                     }
                 }
-                
+
                 iter.positions.push(Position {
                     index,
                     weight,
@@ -70,30 +71,36 @@ fn parse_positions_file<P: AsRef<Path>>(path: P) -> io::Result<Vec<Iteration>> {
             }
         }
     }
-    
+
     // Don't forget the last iteration
     if let Some(iter) = current_iteration {
         iterations.push(iter);
     }
-    
+
     Ok(iterations)
 }
 
-
 fn main() -> io::Result<()> {
+    // Parse the bio-grid-fruitfly graph with 4 embedding dimensions
+    let graph = graph::Graph::parse_from_edge_list_file("bio-grid-fruitfly", 4)?;
+    // Print the graph details
+    graph.save_weights_file("bio-grid-fruitfly-weights.txt");
+
+    // Parse the positions file
+
     let positions_path = "positions.log";
-    
+
     let mut iterations = parse_positions_file(positions_path)?;
-    
+
     // Print summary
     println!("Parsed {} iterations", iterations.len());
     for iter in &iterations {
         println!(
-            "Iteration {}: {} positions", 
-            iter.number, 
-            iter.positions.len(), 
+            "Iteration {}: {} positions",
+            iter.number,
+            iter.positions.len(),
         );
     }
-    
+
     Ok(())
 }
