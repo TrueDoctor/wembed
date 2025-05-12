@@ -8,7 +8,7 @@ mod vec;
 
 fn main() -> io::Result<()> {
     // Parse the bio-grid-fruitfly graph with 4 embedding dimensions
-    let graph = graph::Graph::parse_from_edge_list_file("bio-grid-fruitfly")?;
+    let graph = graph::Graph::parse_from_edge_list_file("bio-grid-fruitfly", 4, 4)?;
     // Print the graph details
     graph.save_weights_file("bio-grid-fruitfly-weights.txt");
 

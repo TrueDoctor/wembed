@@ -34,7 +34,11 @@ impl Graph {
 
     /// Parses a graph from an edge list file.
     /// The file should contain pairs of integers representing edges.
-    pub fn parse_from_edge_list_file(file_path: &str) -> io::Result<Self> {
+    pub fn parse_from_edge_list_file(
+        file_path: &str,
+        embedding_dim: usize,
+        latent_dim_hint: usize,
+    ) -> io::Result<Self> {
         let mut graph = Graph::new();
         graph.edges = read_to_string(file_path)
             .unwrap()
@@ -62,8 +66,8 @@ impl Graph {
         for i in 0..node_degree.len() {
             graph.nodes.push(Node {
                 // weight = degree ^ (d/8)
-                // TODO: use dimension for weight
-                weight: (node_degree[i] as f64) * (node_degree.len() as f64 / total_weight as f64),
+                weight: (node_degree[i] as f64).powf(embedding_dim as f64 / latent_dim_hint as f64)
+                    * (node_degree.len() as f64 / total_weight as f64),
             });
         }
         Ok(graph)
