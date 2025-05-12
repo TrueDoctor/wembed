@@ -1,8 +1,9 @@
+use graph::Embedding;
 use std::io;
-use vec::DVec;
 
 mod graph;
 mod parsing;
+mod query;
 mod vec;
 
 fn main() -> io::Result<()> {
@@ -16,12 +17,18 @@ fn main() -> io::Result<()> {
     let positions_path = "positions.log";
 
     let iterations = parsing::parse_positions_file(positions_path)?;
-    let embeddings: Vec<Vec<DVec<4>>> = iterations.iter().map(From::from).collect();
+    let embeddings: Vec<Embedding<4>> = iterations
+        .iter()
+        .map(|x| Embedding {
+            positions: x.into(),
+            graph: &graph,
+        })
+        .collect();
 
     // Print summary
     println!("Parsed {} iterations", iterations.len());
     for (i, iter) in embeddings.iter().enumerate() {
-        println!("Iteration {}: {} positions", i, iter.len(),);
+        println!("Iteration {}: {} positions", i, iter.positions.len(),);
     }
 
     Ok(())

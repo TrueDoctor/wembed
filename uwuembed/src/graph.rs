@@ -9,7 +9,7 @@ use crate::vec::DVec;
 // Each node has a weight, which is degree ^ (d/8)
 #[derive(Clone, Copy)]
 pub struct Node {
-    weight: f64,
+    pub weight: f64,
 }
 
 // A graph structure
@@ -23,8 +23,6 @@ pub struct Embedding<'a, const D: usize> {
     pub positions: Vec<DVec<D>>,
     pub graph: &'a Graph,
 }
-
-impl Node {}
 
 impl Graph {
     pub fn new() -> Self {
@@ -64,6 +62,7 @@ impl Graph {
         for i in 0..node_degree.len() {
             graph.nodes.push(Node {
                 // weight = degree ^ (d/8)
+                // TODO: use dimension for weight
                 weight: (node_degree[i] as f64) * (node_degree.len() as f64 / total_weight as f64),
             });
         }
