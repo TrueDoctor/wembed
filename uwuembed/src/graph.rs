@@ -3,9 +3,11 @@ use std::fs::read_to_string;
 use std::io;
 use std::io::Write;
 
+use crate::vec::DVec;
+
 // A node in the graph
 // Each node has a weight, which is degree ^ (d/8)
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Node {
     weight: f64,
 }
@@ -13,15 +15,20 @@ pub struct Node {
 // A graph structure
 // It contains the embedding dimension, nodes, and edges
 pub struct Graph {
-    pub d: usize,
     pub nodes: Vec<Node>,
     pub edges: Vec<(usize, usize)>,
 }
 
+pub struct Embedding<'a, const D: usize> {
+    pub positions: Vec<DVec<D>>,
+    pub graph: &'a Graph,
+}
+
+impl Node {}
+
 impl Graph {
     pub fn new() -> Self {
         Graph {
-            d: 4, // Default embedding dimension
             nodes: Vec::new(),
             edges: Vec::new(),
         }
@@ -29,9 +36,8 @@ impl Graph {
 
     /// Parses a graph from an edge list file.
     /// The file should contain pairs of integers representing edges.
-    pub fn parse_from_edge_list_file(file_path: &str, dimension: usize) -> io::Result<Self> {
+    pub fn parse_from_edge_list_file(file_path: &str) -> io::Result<Self> {
         let mut graph = Graph::new();
-        graph.d = dimension;
         graph.edges = read_to_string(file_path)
             .unwrap()
             .lines()
@@ -63,15 +69,20 @@ impl Graph {
         }
         Ok(graph)
     }
+}
 
-    pub fn save_radii_file(&self, file_path: &str) {
+// Debug functions
+
+impl Graph {
+    // Stores radii for each node when querying power of two weight classes
+    pub fn save_radii_file(&self, file_path: &str, dimension: usize) {
         let mut file = std::fs::File::create(file_path).unwrap();
         write!(file, "Node, radius\n").unwrap();
         for i in 0..10 {
             for (j, node) in self.nodes.iter().enumerate() {
                 //We set the radius to ri(u) = l · (w(u)*2^i)^(1/d)
                 let radius =
-                    (node.weight as f64 * 2.0_f64.powi(i as i32)).powf(1.0 / self.d as f64);
+                    (node.weight as f64 * 2.0_f64.powi(i as i32)).powf(1.0 / dimension as f64);
                 writeln!(file, "{}, {}", j, radius).unwrap();
             }
         }

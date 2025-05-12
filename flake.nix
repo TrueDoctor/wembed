@@ -22,13 +22,25 @@
       url = "github:pybind/pybind11/v2.13.6";
       flake = false;
     };
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, flake-utils, googletest, cli11, girgs, pybind11 }:
+  outputs = { self, nixpkgs, flake-utils, googletest, cli11, girgs, pybind11, rust-overlay }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = nixpkgs.legacyPackages.${system};
         python = pkgs.python3;
+        overlays = [ (import rust-overlay) ];
+        toolchain = pkgs.rust-bin.stable.latest.default.override {
+          extensions = ["rust-src" "clippy" "rust-analyzer"];
+        };
+
+        pkgs = import nixpkgs {
+          inherit system overlays;
+        };
+        
 
         # Common build inputs and setup for both library and full package
         commonArgs = {
@@ -191,6 +203,11 @@
             python3.pkgs.pytest
             python3.pkgs.black
             python3.pkgs.flake8
+
+            # Rust Development tools
+            bacon
+            samply
+            toolchain
           ];
 
           shellHook = ''
