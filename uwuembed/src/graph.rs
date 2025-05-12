@@ -3,33 +3,45 @@ use std::fs::read_to_string;
 use std::io;
 use std::io::Write;
 
+use crate::NodeId;
 use crate::vec::DVec;
 
 // A node in the graph
 // Each node has a weight, which is degree ^ (d/8)
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Node {
     pub weight: f64,
     pub neighbors: Vec<usize>,
 }
+const DEG_PRECOMPUTE: usize = 200;
 
 // A graph structure
 // It contains the embedding dimension, nodes, and edges
+#[derive(Debug)]
 pub struct Graph {
     pub nodes: Vec<Node>,
-    pub edges: Vec<(usize, usize)>,
+    pub edges: Vec<(NodeId, NodeId)>,
+    pub pow_lut: [f64; DEG_PRECOMPUTE * DEG_PRECOMPUTE],
 }
 
+impl Default for Graph {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Clone)]
 pub struct Embedding<'a, const D: usize> {
     pub positions: Vec<DVec<D>>,
     pub graph: &'a Graph,
 }
 
 impl Graph {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Graph {
             nodes: Vec::new(),
             edges: Vec::new(),
+            pow_lut: [0.; DEG_PRECOMPUTE * DEG_PRECOMPUTE],
         }
     }
 
@@ -64,19 +76,44 @@ impl Graph {
             node_degree[*v] += 1;
         }
         let total_weight: usize = node_degree.iter().sum();
+        let weight_norm = node_degree.len() as f64 / total_weight as f64;
+        let dim_ratio = embedding_dim as f64 / latent_dim_hint as f64;
         for i in 0..node_degree.len() {
             graph.nodes.push(Node {
                 // weight = degree ^ (d/8)
-                weight: (node_degree[i] as f64).powf(embedding_dim as f64 / latent_dim_hint as f64)
-                    * (node_degree.len() as f64 / total_weight as f64),
+                weight: (node_degree[i] as f64).powf(dim_ratio) * weight_norm,
                 neighbors: Vec::new(),
             });
+        }
+        for i in 0..DEG_PRECOMPUTE {
+            for j in 0..DEG_PRECOMPUTE {
+                graph.pow_lut[i * DEG_PRECOMPUTE + j] = ((i as f64).powf(dim_ratio)
+                    * weight_norm
+                    * (j as f64).powf(dim_ratio)
+                    * weight_norm)
+                    .powf(1. / embedding_dim as f64)
+                    .powi(2)
+            }
         }
         for (u, v) in graph.edges.iter() {
             graph.nodes[*u].neighbors.push(*v);
             graph.nodes[*v].neighbors.push(*u);
         }
+
+        // TODO: Sort nodes by degree and reassign indices
         Ok(graph)
+    }
+
+    #[inline(always)]
+    pub fn distance_weight_squared(&self, i: usize, j: usize, dimension_factor: f64) -> f64 {
+        let deg_i = self.nodes[i].neighbors.len();
+        let deg_j = self.nodes[j].neighbors.len();
+        if deg_i >= DEG_PRECOMPUTE || deg_j >= DEG_PRECOMPUTE {
+            // dbg!(deg_i.max(deg_j));
+            // unsafe { unreachable_unchecked() };
+            return (self.nodes[i].weight * self.nodes[j].weight).powf(dimension_factor);
+        }
+        self.pow_lut[deg_i * DEG_PRECOMPUTE + deg_j]
     }
 }
 

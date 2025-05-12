@@ -99,6 +99,9 @@ impl<const D: usize> DVec<D> {
     pub fn distance(&self, other: &Self) -> f64 {
         (*self - *other).magnitude()
     }
+    pub fn distance_squared(&self, other: &Self) -> f64 {
+        (*self - *other).magnitude_squared()
+    }
 
     pub fn manhattan_distance(&self, other: &Self) -> f64 {
         (*self - *other).manhattan_norm()

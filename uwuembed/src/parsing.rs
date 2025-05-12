@@ -87,7 +87,7 @@ impl<const D: usize> From<&Iteration> for Vec<DVec<D>> {
         if !value
             .positions
             .first()
-            .is_some_and(|x| x.coordinates.len() != D)
+            .is_some_and(|x| x.coordinates.len() == D)
         {
             panic!("Graph dimension from data file did not match the compiled graph dimension");
         }
