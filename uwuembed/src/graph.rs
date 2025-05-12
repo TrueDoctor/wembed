@@ -7,9 +7,10 @@ use crate::vec::DVec;
 
 // A node in the graph
 // Each node has a weight, which is degree ^ (d/8)
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct Node {
     pub weight: f64,
+    pub neighbors: Vec<usize>,
 }
 
 // A graph structure
@@ -68,7 +69,12 @@ impl Graph {
                 // weight = degree ^ (d/8)
                 weight: (node_degree[i] as f64).powf(embedding_dim as f64 / latent_dim_hint as f64)
                     * (node_degree.len() as f64 / total_weight as f64),
+                neighbors: Vec::new(),
             });
+        }
+        for (u, v) in graph.edges.iter() {
+            graph.nodes[*u].neighbors.push(*v);
+            graph.nodes[*v].neighbors.push(*u);
         }
         Ok(graph)
     }
@@ -97,5 +103,9 @@ impl Graph {
         for (i, node) in self.nodes.iter().enumerate() {
             writeln!(file, "{}, {}", i, node.weight).unwrap();
         }
+    }
+
+    pub fn is_connected(&self, u: usize, v: usize) -> bool {
+        self.nodes[u].neighbors.contains(&v)
     }
 }

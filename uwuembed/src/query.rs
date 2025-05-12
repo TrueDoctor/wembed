@@ -22,6 +22,7 @@ impl<const D: usize> Query for Naive<'_, D> {
         for (i, (node, position)) in graph.nodes.iter().zip(positions.iter()).enumerate() {
             if own_position.distance(position) / (own_weight * node.weight).powf(1. / D as f64)
                 < radius
+                && !graph.is_connected(index, i)
             {
                 output.push(i);
             }
