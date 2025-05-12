@@ -13,7 +13,6 @@ pub struct Node {
     pub weight: f64,
     pub neighbors: Vec<usize>,
 }
-const DEG_PRECOMPUTE: usize = 200;
 
 // A graph structure
 // It contains the embedding dimension, nodes, and edges
@@ -21,7 +20,6 @@ const DEG_PRECOMPUTE: usize = 200;
 pub struct Graph {
     pub nodes: Vec<Node>,
     pub edges: Vec<(NodeId, NodeId)>,
-    pub pow_lut: [f64; DEG_PRECOMPUTE * DEG_PRECOMPUTE],
 }
 
 impl Default for Graph {
@@ -41,7 +39,6 @@ impl Graph {
         Graph {
             nodes: Vec::new(),
             edges: Vec::new(),
-            pow_lut: [0.; DEG_PRECOMPUTE * DEG_PRECOMPUTE],
         }
     }
 
@@ -81,19 +78,10 @@ impl Graph {
         for i in 0..node_degree.len() {
             graph.nodes.push(Node {
                 // weight = degree ^ (d/8)
-                weight: (node_degree[i] as f64).powf(dim_ratio) * weight_norm,
+                weight: ((node_degree[i] as f64).powf(dim_ratio) * weight_norm)
+                    .powf(1. / embedding_dim as f64),
                 neighbors: Vec::new(),
             });
-        }
-        for i in 0..DEG_PRECOMPUTE {
-            for j in 0..DEG_PRECOMPUTE {
-                graph.pow_lut[i * DEG_PRECOMPUTE + j] = ((i as f64).powf(dim_ratio)
-                    * weight_norm
-                    * (j as f64).powf(dim_ratio)
-                    * weight_norm)
-                    .powf(1. / embedding_dim as f64)
-                    .powi(2)
-            }
         }
         for (u, v) in graph.edges.iter() {
             graph.nodes[*u].neighbors.push(*v);
@@ -102,18 +90,6 @@ impl Graph {
 
         // TODO: Sort nodes by degree and reassign indices
         Ok(graph)
-    }
-
-    #[inline(always)]
-    pub fn distance_weight_squared(&self, i: usize, j: usize, dimension_factor: f64) -> f64 {
-        let deg_i = self.nodes[i].neighbors.len();
-        let deg_j = self.nodes[j].neighbors.len();
-        if deg_i >= DEG_PRECOMPUTE || deg_j >= DEG_PRECOMPUTE {
-            // dbg!(deg_i.max(deg_j));
-            // unsafe { unreachable_unchecked() };
-            return (self.nodes[i].weight * self.nodes[j].weight).powf(dimension_factor);
-        }
-        self.pow_lut[deg_i * DEG_PRECOMPUTE + deg_j]
     }
 }
 
