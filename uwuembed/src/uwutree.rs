@@ -109,10 +109,16 @@ impl<'a, const D: usize> UwuTree<'a, D> {
     }
 
     pub fn evaluate_intersections(&self) {
-        for i in (0..100_000).step_by(2000) {
+        for i in (16_000..100_000.min(self.positions.len())).step_by(500) {
+            println!("comuting weigth threshold");
             let weight_threshold = self.compute_weight_threshold(i);
+            println!("weight threshold: {}", weight_threshold);
             let mut clusters = self.generate_clusters(weight_threshold);
+            println!("found {} clusters", clusters.len());
+            println!("assigning nodes to closest cluster");
             self.assign_nodes_to_clusters(&mut clusters);
+            println!("finished assigning nodes to clusters");
+
             // dbg!(clusters.len(), self.positions.len());
             for cluster in &clusters {
                 // dbg!(cluster.members.len());
@@ -125,9 +131,13 @@ impl<'a, const D: usize> UwuTree<'a, D> {
             );
             // self.compute_cluster_intersections(&clusters);
             let mut tree = UTree::default();
+            println!("strarting insert");
             for cluster in clusters {
                 tree.insert(cluster);
             }
+            println!("finished building tree");
+            dbg!(tree.roots.len(), tree.arena[tree.roots[0]].members.len());
+            assert!(tree.roots.len() == 1);
         }
     }
 }
@@ -143,7 +153,7 @@ struct UTree<const D: usize> {
 
 impl<const D: usize> UTree<D> {
     fn insert(&mut self, node: TreeNode<D>) {
-        let Some(&id) = self
+        let Some(&root) = self
             .roots
             .iter()
             .find(|&x| self.arena[*x].intersects(&node))
@@ -153,20 +163,23 @@ impl<const D: usize> UTree<D> {
             return;
         };
 
-        self.insert_into_tree(id, node);
+        self.insert_into_tree(root, node, 0);
 
-        // TODO: check if root id now intersects with other roots
-        let tree = &self.arena[id];
-        let Some(intersecting_id) = self
+        self.consolidate_root(root);
+    }
+
+    fn consolidate_root(&mut self, root: NodeId) {
+        let tree = &self.arena[root];
+        let Some(intersecting_pos) = self
             .roots
             .iter()
-            .find(|&&x| x != id && self.arena[x].intersects(tree))
+            .position(|&x| x != root && self.arena[x].intersects(tree))
         else {
             return;
         };
-        self.arena[*intersecting_id].members.push(id);
-        self.roots
-            .swap_remove(self.roots.iter().position(|x| x == &id).unwrap());
+        self.join_nodes_under_new_parent_by_id(root, self.roots[intersecting_pos]);
+        self.roots.swap_remove(intersecting_pos);
+        self.consolidate_root(root);
     }
 
     fn alloc_node(&mut self, node: TreeNode<D>) -> TreeNodeId {
@@ -174,18 +187,35 @@ impl<const D: usize> UTree<D> {
         self.arena.len() - 1
     }
 
-    fn insert_into_tree(&mut self, tree: TreeNodeId, node: TreeNode<D>) {
+    fn insert_into_tree(&mut self, tree: TreeNodeId, node: TreeNode<D>, depth: usize) {
         let tree_node = self.arena[tree].clone();
+        // If node is leaf, join both nodes under new parent
         if tree_node.is_leaf {
+            // if depth > 4 {
+            //     println!("depth: {depth}");
+            // }
             self.join_nodes_under_new_parent(tree, node);
             return;
         }
+        let mut best_cluster = NodeId::MAX;
+        let mut best_cluster_score = f64::INFINITY;
+        let mut found_non_intersecting = false;
+        for cluster in tree_node.members.iter() {
+            let dist = self.arena[*cluster]
+                .position
+                .distance_squared(&node.position);
+            let weight = self.arena[*cluster].max_weight.max(node.max_weight);
+            let score = dist * weight;
+            let intersects = self.arena[*cluster].intersects(&node);
+            found_non_intersecting |= !intersects;
+            if intersects && score < best_cluster_score {
+                best_cluster_score = score;
+                best_cluster = *cluster;
+            }
+        }
 
-        let Some(mut i) = tree_node
-            .members
-            .iter()
-            .position(|&m| !self.arena[m].intersects(&node))
-        else {
+        if !found_non_intersecting {
+            // If node intersects all nodes in parent, add it as member
             {
                 let tree_node = &mut self.arena[tree];
                 let dist =
@@ -196,24 +226,16 @@ impl<const D: usize> UTree<D> {
             let id = self.alloc_node(node);
             self.arena[tree].members.push(id);
             return;
-        };
-
-        if i == 0 {
-            if let Some(new_i) = tree_node
-                .members
-                .iter()
-                .position(|&m| self.arena[m].intersects(&node))
-            {
-                i = new_i
-            } else {
-                self.join_nodes_under_new_parent(tree, node);
-                return;
-            }
         }
 
-        self.insert_into_tree(i, node);
+        if best_cluster == NodeId::MAX {
+            self.join_nodes_under_new_parent(tree, node);
+            return;
+        }
 
-        let new_tree = self.arena[i].clone();
+        self.insert_into_tree(best_cluster, node, depth + 1);
+
+        let new_tree = self.arena[best_cluster].clone();
         let tree_node = &mut self.arena[tree];
         tree_node.max_weight = tree_node.max_weight.max(new_tree.max_weight);
         let dist =
@@ -222,16 +244,21 @@ impl<const D: usize> UTree<D> {
     }
 
     fn join_nodes_under_new_parent(&mut self, tree: usize, node: Cluster<D>) {
+        let node_id = self.alloc_node(node);
+        self.join_nodes_under_new_parent_by_id(tree, node_id);
+    }
+
+    fn join_nodes_under_new_parent_by_id(&mut self, tree: NodeId, node_id: NodeId) {
         let tree_node = &self.arena[tree];
+        let node = &self.arena[node_id];
         // TODO: sinnvoll mathe machen siehe foto vom 12.05 dennis;
         let new_pos = (tree_node.position + node.position) / 2.;
         let d1 = new_pos.distance_squared(&tree_node.position) + tree_node.max_dist_squared;
         let d2 = new_pos.distance_squared(&node.position) + node.max_dist_squared;
         let new_max_dist = d1.max(d2);
         let new_max_weight = node.max_weight.max(tree_node.max_weight);
-        let new_node_id = self.alloc_node(node);
         let mut new_node = TreeNode {
-            members: vec![new_node_id],
+            members: vec![node_id],
             position: new_pos,
             max_dist_squared: new_max_dist,
             max_weight: new_max_weight,
