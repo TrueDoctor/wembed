@@ -138,6 +138,20 @@ impl<'a, const D: usize> UwuTree<'a, D> {
             println!("finished building tree");
             dbg!(tree.roots.len(), tree.arena[tree.roots[0]].members.len());
             assert!(tree.roots.len() == 1);
+            println!("querying all nodes");
+            for (node, pos) in self.graph.nodes.iter().zip(self.positions.iter()) {
+                let node = Cluster {
+                    members: vec![],
+                    position: *pos,
+                    max_dist_squared: 0.,
+                    max_weight: node.weight,
+                    is_leaf: true,
+                };
+                let mut intersections = Vec::new();
+                tree.query(tree.roots[0], &node, &mut intersections);
+                println!("found {} intersections", intersections.len());
+            }
+            println!("done querying");
         }
     }
 }
@@ -152,6 +166,18 @@ struct UTree<const D: usize> {
 }
 
 impl<const D: usize> UTree<D> {
+    fn query(&self, tree: NodeId, node: &TreeNode<D>, intersections: &mut Vec<NodeId>) {
+        if self.arena[tree].is_leaf {
+            intersections.push(tree);
+            return;
+        }
+        for &member in &self.arena[tree].members {
+            if self.arena[member].intersects(node) {
+                self.query(member, node, intersections);
+            }
+        }
+    }
+
     fn insert(&mut self, node: TreeNode<D>) {
         let Some(&root) = self
             .roots
@@ -163,7 +189,7 @@ impl<const D: usize> UTree<D> {
             return;
         };
 
-        self.insert_into_tree(root, node, 0);
+        self.insert_into_tree(root, node);
 
         self.consolidate_root(root);
     }
@@ -187,13 +213,10 @@ impl<const D: usize> UTree<D> {
         self.arena.len() - 1
     }
 
-    fn insert_into_tree(&mut self, tree: TreeNodeId, node: TreeNode<D>, depth: usize) {
+    fn insert_into_tree(&mut self, tree: TreeNodeId, node: TreeNode<D>) {
         let tree_node = self.arena[tree].clone();
         // If node is leaf, join both nodes under new parent
         if tree_node.is_leaf {
-            // if depth > 4 {
-            //     println!("depth: {depth}");
-            // }
             self.join_nodes_under_new_parent(tree, node);
             return;
         }
@@ -233,7 +256,7 @@ impl<const D: usize> UTree<D> {
             return;
         }
 
-        self.insert_into_tree(best_cluster, node, depth + 1);
+        self.insert_into_tree(best_cluster, node);
 
         let new_tree = self.arena[best_cluster].clone();
         let tree_node = &mut self.arena[tree];
