@@ -1,4 +1,4 @@
-use crate::{Embedding, NodeId, graph::Graph, query::Update, vec::DVec};
+use crate::{Embedding, Naive, NodeId, Query, graph::Graph, query::Update, vec::DVec};
 
 #[derive(Debug, Clone)]
 pub struct UwuTree<'a, const D: usize> {
@@ -15,6 +15,7 @@ pub struct Cluster<const D: usize> {
     max_dist_squared: f64,
     max_weight: f64,
     is_leaf: bool,
+    total_children: usize,
 }
 
 impl<const D: usize> Cluster<D> {
@@ -54,6 +55,7 @@ impl<'a, const D: usize> UwuTree<'a, D> {
                     max_dist_squared: 0.,
                     max_weight: node.weight,
                     is_leaf: true,
+                    total_children: 0,
                 })
             }
         }
@@ -108,50 +110,103 @@ impl<'a, const D: usize> UwuTree<'a, D> {
         );
     }
 
-    pub fn evaluate_intersections(&self) {
-        for i in (16_000..100_000.min(self.positions.len())).step_by(500) {
+    pub fn evaluate_intersections(&mut self) {
+        let embedding = Embedding {
+            positions: self.positions.clone(),
+            graph: self.graph,
+        };
+        let naive = Naive::new(&embedding);
+        for i in (15000..50_000.min(self.positions.len())).step_by(2000) {
+            self.spatial_neighbors_lists = vec![Vec::new(); self.graph.nodes.len()];
             println!("comuting weigth threshold");
             let weight_threshold = self.compute_weight_threshold(i);
             println!("weight threshold: {}", weight_threshold);
             let mut clusters = self.generate_clusters(weight_threshold);
+            clusters.sort_unstable_by_key(|c| {
+                std::cmp::Reverse((c.max_weight * c.max_dist_squared * 1000000.) as usize)
+            });
+            let clusters = &mut clusters[..i];
             println!("found {} clusters", clusters.len());
             println!("assigning nodes to closest cluster");
-            self.assign_nodes_to_clusters(&mut clusters);
+            self.assign_nodes_to_clusters(clusters);
             println!("finished assigning nodes to clusters");
 
             // dbg!(clusters.len(), self.positions.len());
-            for cluster in &clusters {
-                // dbg!(cluster.members.len());
-            }
+            // for cluster in clusters {
+            //     // dbg!(cluster.members.len());
+            // }
             // println!("clusters {:?}", clusters);
             println!(
                 "i: {} ({:.2}%)",
                 i,
-                i as f64 / self.positions.len() as f64 * 100.
+                clusters.len() as f64 / self.positions.len() as f64 * 100.
             );
             // self.compute_cluster_intersections(&clusters);
             let mut tree = UTree::default();
+            tree.arena.reserve(clusters.len() * 2);
             println!("strarting insert");
-            for cluster in clusters {
-                tree.insert(cluster);
+
+            // TODO: insert clusters by desc weight / score
+
+            for cluster in clusters.iter() {
+                tree.insert(cluster.clone());
             }
+            println!("merging {} roots", tree.roots.len());
+            tree.merge_roots();
             println!("finished building tree");
             dbg!(tree.roots.len(), tree.arena[tree.roots[0]].members.len());
             assert!(tree.roots.len() == 1);
             println!("querying all nodes");
-            for (node, pos) in self.graph.nodes.iter().zip(self.positions.iter()) {
-                let node = Cluster {
-                    members: vec![],
-                    position: *pos,
-                    max_dist_squared: 0.,
-                    max_weight: node.weight,
-                    is_leaf: true,
-                };
+            let mut i = 0;
+            let mut total_nodes_queried = 0;
+            let mut total_intersections = 0;
+            let start = std::time::Instant::now();
+            for cluster in clusters.iter() {
+                i += 1;
+                let node = cluster;
                 let mut intersections = Vec::new();
-                tree.query(tree.roots[0], &node, &mut intersections);
-                println!("found {} intersections", intersections.len());
+                let mut checks = 0;
+                let depth = tree.query(tree.roots[0], node, &mut intersections, &mut checks, 0);
+                let mut sum_intersections = 0;
+                total_nodes_queried += cluster.members.len();
+                for &node in &cluster.members {
+                    for &other_cluster in &intersections {
+                        let other_cluster = &tree.arena[other_cluster];
+                        for &other_node in &other_cluster.members {
+                            if self.positions[node].distance_squared(&self.positions[other_node])
+                                < (self.graph.nodes[node].weight
+                                    * self.graph.nodes[other_node].weight)
+                                    .powi(2)
+                            {
+                                self.spatial_neighbors_lists[node].push(other_node);
+                                sum_intersections += 1;
+                                total_intersections += 1;
+                            }
+                        }
+                    }
+                    let mut query_list = naive.repelling_nodes(node);
+
+                    self.spatial_neighbors_lists[node].sort_unstable();
+                    query_list.sort_unstable();
+                    assert_eq!(self.spatial_neighbors_lists[node], query_list);
+                }
+                if i % clusters.len() / 10 == 0 {
+                    println!(
+                        "found {} intersections after {} checks with depth {}. Avg intersections per node: {:.2}, members: {}",
+                        intersections.len(),
+                        checks,
+                        depth,
+                        sum_intersections as f64 / cluster.members.len() as f64,
+                        cluster.members.len(),
+                    );
+                }
             }
-            println!("done querying");
+            println!(
+                "\n\n\ndone querying after {}s queried {} nodes with {} total intersections\n\n\n",
+                start.elapsed().as_secs(),
+                total_nodes_queried,
+                total_intersections
+            );
         }
     }
 }
@@ -166,16 +221,38 @@ struct UTree<const D: usize> {
 }
 
 impl<const D: usize> UTree<D> {
-    fn query(&self, tree: NodeId, node: &TreeNode<D>, intersections: &mut Vec<NodeId>) {
+    fn query(
+        &self,
+        tree: NodeId,
+        node: &TreeNode<D>,
+        intersections: &mut Vec<NodeId>,
+        checks: &mut usize,
+        depth: usize,
+    ) -> usize {
         if self.arena[tree].is_leaf {
             intersections.push(tree);
-            return;
+            return depth;
         }
+        let mut new_depth = depth;
         for &member in &self.arena[tree].members {
+            *checks += 1;
             if self.arena[member].intersects(node) {
-                self.query(member, node, intersections);
+                let subtree_depth = self.query(member, node, intersections, checks, depth + 1);
+                new_depth = new_depth.max(subtree_depth);
             }
         }
+        new_depth
+    }
+    fn tree_size(&self, tree: NodeId) -> usize {
+        // println!("{}", self.arena[tree].members.len());
+        if self.arena[tree].is_leaf {
+            return self.arena[tree].members.len();
+        }
+        let mut sum = 0;
+        for &member in &self.arena[tree].members {
+            sum += self.tree_size(member);
+        }
+        sum
     }
 
     fn insert(&mut self, node: TreeNode<D>) {
@@ -191,7 +268,7 @@ impl<const D: usize> UTree<D> {
 
         self.insert_into_tree(root, node);
 
-        self.consolidate_root(root);
+        // self.consolidate_root(root);
     }
 
     fn consolidate_root(&mut self, root: NodeId) {
@@ -206,6 +283,21 @@ impl<const D: usize> UTree<D> {
         self.join_nodes_under_new_parent_by_id(root, self.roots[intersecting_pos]);
         self.roots.swap_remove(intersecting_pos);
         self.consolidate_root(root);
+    }
+
+    fn merge_roots(&mut self) {
+        let mut roots: Vec<_> = self
+            .roots
+            .iter()
+            .map(|&id| (id, self.tree_size(id)))
+            .collect();
+        roots.sort_unstable_by_key(|x| x.1);
+        let root_tree = roots.pop().unwrap().0;
+        while let Some((root, _)) = roots.pop() {
+            // TODO: This Orphans the original storage location for the root node making it inaccessible but keeping it is the graph structure
+            self.insert_into_tree(root_tree, self.arena[root].clone());
+        }
+        self.roots = vec![root_tree];
     }
 
     fn alloc_node(&mut self, node: TreeNode<D>) -> TreeNodeId {
@@ -223,12 +315,16 @@ impl<const D: usize> UTree<D> {
         let mut best_cluster = NodeId::MAX;
         let mut best_cluster_score = f64::INFINITY;
         let mut found_non_intersecting = false;
+        let total_children = tree_node.total_children;
         for cluster in tree_node.members.iter() {
             let dist = self.arena[*cluster]
                 .position
                 .distance_squared(&node.position);
             let weight = self.arena[*cluster].max_weight.max(node.max_weight);
-            let score = dist * weight;
+            let children = self.arena[*cluster].total_children;
+            // let score = dist.powi(D as i32) * weight * (children as f64 / total_children as f64);
+            let score = dist * weight.powi(2);
+            // dbg!(score);
             let intersects = self.arena[*cluster].intersects(&node);
             found_non_intersecting |= !intersects;
             if intersects && score < best_cluster_score {
@@ -237,7 +333,7 @@ impl<const D: usize> UTree<D> {
             }
         }
 
-        if !found_non_intersecting {
+        if !found_non_intersecting || best_cluster_score > 10. {
             // If node intersects all nodes in parent, add it as member
             {
                 let tree_node = &mut self.arena[tree];
@@ -248,6 +344,7 @@ impl<const D: usize> UTree<D> {
             }
             let id = self.alloc_node(node);
             self.arena[tree].members.push(id);
+            self.arena[tree].total_children += 1;
             return;
         }
 
@@ -264,6 +361,7 @@ impl<const D: usize> UTree<D> {
         let dist =
             tree_node.position.distance_squared(&new_tree.position) + new_tree.max_dist_squared;
         tree_node.max_dist_squared = tree_node.max_dist_squared.max(dist);
+        tree_node.total_children += 1;
     }
 
     fn join_nodes_under_new_parent(&mut self, tree: usize, node: Cluster<D>) {
@@ -286,6 +384,7 @@ impl<const D: usize> UTree<D> {
             max_dist_squared: new_max_dist,
             max_weight: new_max_weight,
             is_leaf: false,
+            total_children: 2,
         };
         std::mem::swap(&mut new_node, &mut self.arena[tree]);
         let new_tree_id = self.alloc_node(new_node);
