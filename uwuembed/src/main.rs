@@ -27,7 +27,7 @@ fn main() -> io::Result<()> {
     println!("Parsed {} iterations", iterations.len());
     println!("Total of  {} nodes", graph.nodes.len());
 
-    // let mut naive = Naive::new(&embeddings[0]);
+    // let mut naive = Naive::new(&embeddings[15]);
     let mut naive = UwuTree::new(&embeddings[15]);
 
     naive.evaluate_intersections();
