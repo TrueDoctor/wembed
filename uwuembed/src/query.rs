@@ -35,7 +35,9 @@ impl<const D: usize> Query for Naive<'_, D> {
         for (i, (node, position)) in graph.nodes.iter().zip(positions.iter()).enumerate() {
             let weight = own_weight * node.weight;
             let distance = own_position.distance_squared(position);
-            if distance < weight.powi(2) && !graph.is_connected(index, i) {
+            if distance < weight.powi(2)
+            /*&& !graph.is_connected(index, i)*/
+            {
                 output.push(i);
             }
         }
