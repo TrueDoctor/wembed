@@ -40,6 +40,9 @@ impl<const D: usize> Cluster<D> {
     }
 
     fn update(&mut self, tree: &UwuTree<'_, D>) {
+        if self.members.is_empty() {
+            return;
+        }
         let sum: DVec<D> = self.members.iter().map(|id| tree.positions[*id]).sum();
         let center = sum / self.members.len() as f64;
 
@@ -127,6 +130,15 @@ impl<'a, const D: usize> UwuTree<'a, D> {
     }
 
     pub fn evaluate_intersections(&mut self) {
+        let classes = [
+            0.,
+            self.compute_weight_threshold(100),
+            self.compute_weight_threshold(1000),
+            self.compute_weight_threshold(10_000),
+            self.compute_weight_threshold(20_000),
+        ];
+
+        let class_index_for_weight = |weight| classes.iter().take_while(|&&x| weight > x).count();
         for i in (19_000..100_000.min(self.positions.len())).step_by(1000) {
             self.spatial_neighbors_lists = vec![Vec::new(); self.graph.nodes.len()];
             println!("comuting weigth threshold");
@@ -147,21 +159,26 @@ impl<'a, const D: usize> UwuTree<'a, D> {
                 i,
                 clusters.len() as f64 / self.positions.len() as f64 * 100.
             );
-            let mut tree = UTree::default();
-            tree.arena.reserve(clusters.len() * 2);
+            let mut trees = vec![UTree::default(); 5];
             println!("strarting insert");
 
             // TODO: insert clusters by desc weight / score
 
             for cluster in clusters.iter() {
-                tree.insert(cluster.clone());
+                let clusters = cluster.split_weight_classes(&classes, self);
+                for (cluster, weight_tree) in clusters.into_iter().zip(trees.iter_mut()) {
+                    weight_tree.insert(cluster.clone());
+                }
             }
 
             // println!("merging {} roots", tree.roots.len());
             // tree.merge_roots();
             println!("finished building tree");
             // dbg!(tree.roots.len(), tree.arena[tree.roots[0]].members.len());
-            println!("clusters in tree root: {}", tree.arena[0].members.len());
+            println!(
+                "clusters in tree root: {}",
+                trees[trees.len() - 1].arena[0].members.len()
+            );
             // assert!(tree.roots.len() == 1);
             println!("querying all nodes");
             let mut i = 0;
@@ -178,9 +195,10 @@ impl<'a, const D: usize> UwuTree<'a, D> {
 
                 let mut intersections = Vec::new();
                 let mut checks = 0;
-                let depth = tree.query(0, &node, &mut intersections, &mut checks, 0);
+                let tree_index = class_index_for_weight(node.max_weight);
+                let depth = trees[tree_index].query(0, &node, &mut intersections, &mut checks, 0);
                 for &other_cluster in &intersections {
-                    let other_cluster = &tree.arena[other_cluster];
+                    let other_cluster = &trees[tree_index].arena[other_cluster];
                     for &other_node in &other_cluster.members {
                         if self.positions[i].distance_squared(&self.positions[other_node])
                             < (self.graph.nodes[i].weight * self.graph.nodes[other_node].weight)
@@ -210,6 +228,7 @@ impl<'a, const D: usize> UwuTree<'a, D> {
 type TreeNode<const D: usize> = Cluster<D>;
 type TreeNodeId = NodeId;
 
+#[derive(Clone)]
 struct UTree<const D: usize> {
     arena: Vec<TreeNode<D>>,
 }
