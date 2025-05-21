@@ -35,7 +35,10 @@ impl<const D: usize> Cluster<D> {
                 output[i].members.push(node);
             }
         }
-        output.iter_mut().for_each(|c| c.update(tree));
+        output.iter_mut().for_each(|c| {
+            c.is_leaf = true;
+            c.update(tree)
+        });
         output
     }
 
@@ -138,7 +141,8 @@ impl<'a, const D: usize> UwuTree<'a, D> {
             self.compute_weight_threshold(20_000),
         ];
 
-        let class_index_for_weight = |weight| classes.iter().take_while(|&&x| weight > x).count();
+        let class_index_for_weight =
+            |weight| classes.iter().take_while(|&&x| weight > x).count() - 1;
         for i in (19_000..100_000.min(self.positions.len())).step_by(1000) {
             self.spatial_neighbors_lists = vec![Vec::new(); self.graph.nodes.len()];
             println!("comuting weigth threshold");
@@ -189,6 +193,7 @@ impl<'a, const D: usize> UwuTree<'a, D> {
                 let node = Cluster {
                     position: self.positions[i],
                     max_weight: self.graph.nodes[i].weight,
+                    is_leaf: true,
                     ..Default::default()
                 };
                 let mut sum_intersections = 0;
