@@ -28,10 +28,13 @@ impl<const D: usize> Cluster<D> {
 
     fn split_weight_classes(&self, classes: &[f64], tree: &UwuTree<'_, D>) -> Vec<Cluster<D>> {
         let mut output = vec![Self::default(); classes.len()];
+        let class_index_for_weight =
+            |weight| classes.iter().take_while(|&&x| weight > x).count() - 1;
         for &node in &self.members {
             let weight = tree.graph.nodes[node].weight;
-            let index = classes.iter().position(|&x| x > weight).unwrap_or_default();
-            for i in 0..index {
+            let index = class_index_for_weight(weight);
+            // dbg!(index);
+            for i in index..output.len() {
                 output[i].members.push(node);
             }
         }
@@ -135,11 +138,12 @@ impl<'a, const D: usize> UwuTree<'a, D> {
     pub fn evaluate_intersections(&mut self) {
         let classes = [
             0.,
-            self.compute_weight_threshold(100),
-            self.compute_weight_threshold(1000),
+            self.compute_weight_threshold(100_000),
             self.compute_weight_threshold(10_000),
-            self.compute_weight_threshold(20_000),
+            self.compute_weight_threshold(1000),
+            self.compute_weight_threshold(100),
         ];
+        dbg!(classes);
 
         let class_index_for_weight =
             |weight| classes.iter().take_while(|&&x| weight > x).count() - 1;
@@ -169,9 +173,11 @@ impl<'a, const D: usize> UwuTree<'a, D> {
             // TODO: insert clusters by desc weight / score
 
             for cluster in clusters.iter() {
-                let clusters = cluster.split_weight_classes(&classes, self);
-                for (cluster, weight_tree) in clusters.into_iter().zip(trees.iter_mut()) {
-                    weight_tree.insert(cluster.clone());
+                let weight_clusters = cluster.split_weight_classes(&classes, self);
+                for (cluster, weight_tree) in weight_clusters.into_iter().zip(trees.iter_mut()) {
+                    if !cluster.members.is_empty() {
+                        weight_tree.insert(cluster.clone());
+                    }
                 }
             }
 
@@ -183,6 +189,23 @@ impl<'a, const D: usize> UwuTree<'a, D> {
                 "clusters in tree root: {}",
                 trees[trees.len() - 1].arena[0].members.len()
             );
+
+            for tree in &trees {
+                dbg!(tree.arena.len());
+                let mut total_nodes = 0;
+                let mut max_weight: f64 = 0.;
+                let mut min_weight: f64 = 100000.;
+                for cluster in &tree.arena {
+                    if cluster.is_leaf {
+                        total_nodes += cluster.members.len();
+                        for node in &cluster.members {
+                            max_weight = max_weight.max(self.graph.nodes[*node].weight);
+                            min_weight = min_weight.min(self.graph.nodes[*node].weight);
+                        }
+                    }
+                }
+                dbg!(total_nodes, max_weight, min_weight);
+            }
             // assert!(tree.roots.len() == 1);
             println!("querying all nodes");
             let mut i = 0;
@@ -205,18 +228,27 @@ impl<'a, const D: usize> UwuTree<'a, D> {
                 for &other_cluster in &intersections {
                     let other_cluster = &trees[tree_index].arena[other_cluster];
                     for &other_node in &other_cluster.members {
+                        if self.graph.nodes[other_node].weight > node.max_weight {
+                            // println!("skipping query");
+                            continue;
+                        }
                         if self.positions[i].distance_squared(&self.positions[other_node])
                             < (self.graph.nodes[i].weight * self.graph.nodes[other_node].weight)
                                 .powi(2)
                         {
                             self.spatial_neighbors_lists[i].push(other_node);
+                            self.spatial_neighbors_lists[other_node].push(i);
                             sum_intersections += 1;
                             total_intersections += 1;
                         }
                     }
                 }
-                if i % (self.graph.nodes.len() / 10) == 0 {
-                    println!("depth: {depth}, intersections: {}", sum_intersections);
+                if i % (self.graph.nodes.len() / 100) == 0 {
+                    println!(
+                        "depth: {depth}, intersections: {}, clusters: {}",
+                        sum_intersections,
+                        intersections.len()
+                    );
                 }
             }
             assert_eq!(total_intersections, 361766);
@@ -318,7 +350,7 @@ impl<const D: usize> UTree<D> {
             }
         }
 
-        if !found_non_intersecting || best_cluster_score > 5. {
+        if !found_non_intersecting || best_cluster_score > 2. {
             // If node intersects all nodes in parent, add it as member
             {
                 let tree_node = &mut self.arena[tree];
