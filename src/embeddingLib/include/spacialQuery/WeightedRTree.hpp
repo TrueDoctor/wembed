@@ -23,7 +23,7 @@ class WeightedRTree {
      * Searches the trees of all classes and performs distance queries on them.
      * The distance depends on the weightclass of the tree, the weight of the node and the given radius.
      *
-     * Finds all p,q, with |p-q| <= radius * (weightClass(q) * weight)^(1/d)
+     * Finds all p,q, with ||p-q|| <= radius * (weightClass(q) * weight)^(1/d)
      */
     void getNodesWithinWeightedDistance(CVecRef p, double weight, double radius, std::vector<NodeId>& output, VecBuffer<2>& buffer) const;
 

@@ -49,6 +49,7 @@ std::vector<double> WeightedRTree::getDoublingWeightBuckets(const std::vector<do
 void WeightedRTree::getNodesWithinWeightedDistance(CVecRef p, double weight, double radius,
                                                    std::vector<NodeId>& output, VecBuffer<2>& buffer) const {
     ASSERT(output.empty());
+    // std::cout << "radius: " << radius << std::endl;
     for (int i = 0; i < maxWeightOfClass.size(); i++) {
         getNodesWithinWeightedDistanceForClass(p, weight, radius, i, output, buffer);
     }
@@ -61,6 +62,7 @@ void WeightedRTree::getNodesWithinWeightedDistanceForClass(CVecRef p, double wei
 
     double maxWeight = maxWeightOfClass[weight_class];
     double queryRadius = radius * Toolkit::myPow(weight * maxWeight, 1.0 / (double)DIMENSION);
+    // std::cout << "radius: " << radius << std::endl;
     getWithinRadius(rTrees[weight_class], p, queryRadius, output, buffer);
 }
 
@@ -86,7 +88,7 @@ int WeightedRTree::getNumWeightClasses() const { return maxWeightOfClass.size();
 
 void WeightedRTree::getKNNNeighbors(const RTree& rtree, CVecRef p, int k, std::vector<NodeId>& output) const {
     ASSERT(p.dimension() == DIMENSION);
-    LOG_SPATIAL_QUERY_NEAREST(p, k);
+    // LOG_SPATIAL_QUERY_NEAREST(p, k);
     rtree.query_nearest(p, k, output);
 }
 
@@ -102,7 +104,8 @@ void WeightedRTree::getWithinRadius(const RTree& rtree, CVecRef p, double radius
         min_corner[i] -= radius;
         max_corner[i] += radius;
     }
-    LOG_SPATIAL_QUERY_SPHERE(min_corner.erase(), max_corner.erase(), p, radius); 
+    // LOG_SPATIAL_QUERY_SPHERE(p, radius); 
+    // LOG_SPATIAL_QUERY_SPHERE(min_corner.erase(), max_corner.erase(), p, radius); 
     rtree.query_sphere(min_corner.erase(), max_corner.erase(), p, radius, output);
 }
 
@@ -118,6 +121,6 @@ void WeightedRTree::getWithinBox(const RTree& rtree, CVecRef p, double radius, s
         min_corner[i] -= radius;
         max_corner[i] += radius;
     }
-    LOG_SPATIAL_QUERY_BOX(min_corner.erase(), max_corner.erase());
+    // LOG_SPATIAL_QUERY_BOX(min_corner.erase(), max_corner.erase());
     rtree.query_box(min_corner.erase(), max_corner.erase(), output);
 }
