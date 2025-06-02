@@ -104,7 +104,7 @@ std::vector<util::TimingResult> WEmbedEmbedder::getTimings() { return timer.getH
 
 void WEmbedEmbedder::calculateAllAttractingForces() {
     VecBuffer<1> buffer(options.embeddingDimension);
-// #pragma omp parallel for firstprivate(buffer), schedule(runtime)
+#pragma omp parallel for firstprivate(buffer), schedule(runtime)
     for (NodeId v : sortedNodeIds) {
         for (NodeId u : graph.getNeighbors(v)) {
             attractionForce(v, u, buffer);
@@ -118,7 +118,7 @@ void WEmbedEmbedder::calculateAllRepellingForces() {
     VecBuffer<2> rTreeBuffer(options.embeddingDimension);
     VecBuffer<1> forceBuffer(options.embeddingDimension);
 
-// #pragma omp parallel for firstprivate(rTreeBuffer, forceBuffer), schedule(runtime)
+#pragma omp parallel for firstprivate(rTreeBuffer, forceBuffer), schedule(runtime)
     for (NodeId v : sortedNodeIds) {
         std::vector<NodeId> repellingCandidates = getRepellingCandidatesForNode(v, rTreeBuffer);
         for (NodeId u : repellingCandidates) {
