@@ -1,23 +1,34 @@
 // SpatialQueryLogger.cpp
+#ifndef ENABLE_SPATIAL_LOGGING
+#define ENABLE_SPATIAL_LOGGING
+#endif
 #ifdef ENABLE_SPATIAL_LOGGING
 
 #include "SpatialQueryLogger.hpp"
 #include <iostream>
+#include "EmbedderOptions.hpp"
 
 namespace spatial_logging {
     static std::ofstream query_log;
     static std::ofstream position_log;
+    static EmbedderOptions options;
+    static int current_iteration = 0;
     
-    void init_logging(const std::string& prefix) {
-        std::string query_filename = prefix + "_queries.log";
-        std::string position_filename = prefix + "_positions.log";
+    void init_logging(EmbedderOptions options) {
+        std::cout << "Log Mod after init: " << options.iteration_logging_mod << std::endl;
+
+        std::string query_filename = options.loggingOutput + "_queries.log";
+        std::string position_filename = options.loggingOutput + "_positions.log";
+        spatial_logging::options = options;  // Store the options for later use
+
+        std::cout << "Log Mod after storing options: " << spatial_logging::options.iteration_logging_mod << std::endl;
         
         query_log.open(query_filename);
         position_log.open(position_filename);
         std::cout << "saving queries to: " << query_filename << std::endl;
         
         if (!query_log.is_open() || !position_log.is_open()) {
-            std::cerr << "Failed to open log files with prefix: " << prefix << std::endl;
+            std::cerr << "Failed to open log files with prefix: " << options.loggingOutput << std::endl;
             return;
         }
     }
@@ -28,6 +39,13 @@ namespace spatial_logging {
     }
 
     void log_iteration(int iter) {
+        current_iteration = iter;
+        if (iter % spatial_logging::options.iteration_logging_mod != 0) return;  // Only log every nth iteration
+
+        std::cout << "Logging iteration " << iter << std::endl;
+
+        std::cout << "Iter % " << options.iteration_logging_mod << " == 0" << std::endl;
+
         if (query_log.is_open()) {
             query_log << "ITERATION " << iter << "\n";
             query_log.flush();
@@ -39,6 +57,8 @@ namespace spatial_logging {
     }
 
     void log_positions(const std::vector<std::vector<double>>& positions, const std::vector<double>& weights) {
+        if (current_iteration % spatial_logging::options.iteration_logging_mod != 0) return;  // Only log every nth iteration
+
         if (!position_log.is_open()) return;
         // std::cout << "logging positions " << std::endl;
         
@@ -59,6 +79,8 @@ namespace spatial_logging {
     }
 
     void log_query_nearest(CVecRef point, unsigned int k) {
+        if (current_iteration % spatial_logging::options.iteration_logging_mod != 0) return;  // Only log every nth iteration
+
         std::cout << "nearest " << std::endl;
         if (!query_log.is_open()) return;
         
@@ -71,6 +93,8 @@ namespace spatial_logging {
     }
 
     void log_query_sphere(CVecRef min_corner, CVecRef max_corner, CVecRef point, double radius) {
+        if (current_iteration % spatial_logging::options.iteration_logging_mod != 0) return;  // Only log every nth iteration
+
         if (!query_log.is_open()) return;
         
         query_log << "SPHERE " << radius << " " << point.dimension() << " ";
@@ -82,6 +106,8 @@ namespace spatial_logging {
     }
 
     void log_query_box(CVecRef min_corner, CVecRef max_corner) {
+        if (current_iteration % spatial_logging::options.iteration_logging_mod != 0) return;  // Only log every nth iteration
+
         std::cout << "box " << std::endl;
         if (!query_log.is_open()) return;
         

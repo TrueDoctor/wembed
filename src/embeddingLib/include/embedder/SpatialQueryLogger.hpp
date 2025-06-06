@@ -4,9 +4,10 @@
 #include <fstream>
 #include <vector>
 #include "DVec.hpp"
+#include "EmbedderOptions.hpp"
 
 namespace spatial_logging {
-    void init_logging(const std::string& prefix);
+    void init_logging(EmbedderOptions options);
     void close_logging();
     void log_iteration(int iter);
     void log_positions(const std::vector<std::vector<double>>& positions, const std::vector<double>& weights);
@@ -15,7 +16,7 @@ namespace spatial_logging {
     void log_query_box(CVecRef min_corner, CVecRef max_corner);
 }
 
-#define LOG_SPATIAL_INIT(prefix) spatial_logging::init_logging(prefix)
+#define LOG_SPATIAL_INIT(opts) spatial_logging::init_logging(opts)
 #define LOG_SPATIAL_CLOSE() spatial_logging::close_logging()
 #define LOG_SPATIAL_QUERY_NEAREST(point, k) spatial_logging::log_query_nearest(point, k)
 #define LOG_SPATIAL_QUERY_SPHERE(min, max, point, r) spatial_logging::log_query_sphere(min, max, point, r)

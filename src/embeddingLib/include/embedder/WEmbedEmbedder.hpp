@@ -25,7 +25,7 @@ class WEmbedEmbedder : public EmbedderInterface {
           currentWeights(g.getNumVertices()) {
         // Initialize coordinates randomly and weights based on degree
         setCoordinates(WEmbedEmbedder::constructRandomCoordinates(opts.embeddingDimension, g.getNumVertices()));
-        LOG_SPATIAL_INIT("spatial_log");
+        LOG_SPATIAL_INIT(opts);
         if (opts.weightType == WeightType::Degree) {
             setWeights(WEmbedEmbedder::rescaleWeights(opts.dimensionHint, opts.embeddingDimension,
                                                       WEmbedEmbedder::constructDegreeWeights(g)));

@@ -33,7 +33,7 @@ class AbstractSimpleEmbedder : public EmbedderInterface {
           oldWeights(g.getNumVertices()),
           newWeights(g.getNumVertices()),
           currentWeightForce(g.getNumVertices()) {
-        LOG_SPATIAL_INIT("spatial_log");
+        LOG_SPATIAL_INIT(opts);
         setWeights(AbstractSimpleEmbedder::rescaleWeights(opts.dimensionHint, opts.embeddingDimension,
                                                         constructDegreeWeights(g)));
         

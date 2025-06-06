@@ -91,4 +91,7 @@ struct EmbedderOptions {
     double maxentMinAlpha = 0.008;
     int rounds = 10;
     int iterations = 50;
+
+    std::string loggingOutput = "spatial_log";
+    int iteration_logging_mod = 1;  // log all iterations with index mod iteration_logging_mod == 0
 };

@@ -118,4 +118,10 @@ void addOptions(CLI::App& app, Options& opts) {
     app.add_option("--speed", opts.embedderOptions.speed, "Speed of the embedding process")->capture_default_str();
     app.add_flag("--use-inf-norm", opts.embedderOptions.useInfNorm,
                  "Uses L_inf norm instead of L_2 to calculate distance between vertices.");
+    app.add_option("--logging-output", opts.embedderOptions.loggingOutput,
+                   "Prefix for the spatial query logging output. If set, spatial queries will be logged to files "
+                   "with this prefix. If not set, no logging will be done.");
+    app.add_option("--iteration_logging_mod", opts.embedderOptions.iteration_logging_mod,
+                      "Log all iterations with index mod iteration_logging_mod == 0")
+          ->capture_default_str();
 }
