@@ -96,11 +96,7 @@ void log_positions(const std::vector<std::vector<double>>& positions, const std:
     // write iteration number
     uint64_t iteration = static_cast<uint64_t>(current_iteration);
     position_log.write(reinterpret_cast<const char*>(&iteration), sizeof(uint64_t));
-    // Write the number of rows and columns (assumes all rows have the same number of columns)
-    uint64_t rows = positions.size();
-    uint64_t cols = rows > 0 ? positions[0].size() : 0;
-    position_log.write(reinterpret_cast<const char*>(&rows), sizeof(uint64_t));
-    position_log.write(reinterpret_cast<const char*>(&cols), sizeof(uint64_t));
+
     // Write the position data
     for (const auto& row : positions) {
         for (double val : row) {
