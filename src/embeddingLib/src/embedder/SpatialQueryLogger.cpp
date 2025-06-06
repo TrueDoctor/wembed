@@ -20,23 +20,22 @@ void init_logging(EmbedderOptions options) {
     std::cout << "Log Mod after init: " << options.iteration_logging_mod << std::endl;
 
     std::string query_filename = options.loggingOutput + "_queries.log";
-    std::string position_filename = options.loggingOutput + "_positions.log";
+    std::string position_filename = options.loggingOutput ;
     spatial_logging::options = options;  // Store the options for later use
 
     std::cout << "Log Mod after storing options: " << spatial_logging::options.iteration_logging_mod << std::endl;
 
-    query_log.open(query_filename);
+    // query_log.open(query_filename);
     position_log.open(position_filename, std::ios::binary);
     std::cout << "saving queries to: " << query_filename << std::endl;
 
-    if (!query_log.is_open() || !position_log.is_open()) {
+    if ( !position_log.is_open()) {
         std::cerr << "Failed to open log files with prefix: " << options.loggingOutput << std::endl;
         return;
     }
 }
 
 void close_logging() {
-    if (query_log.is_open()) query_log.close();
     if (position_log.is_open()) position_log.close();
 }
 
