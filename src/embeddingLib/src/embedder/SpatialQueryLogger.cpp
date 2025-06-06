@@ -24,7 +24,7 @@ namespace spatial_logging {
         std::cout << "Log Mod after storing options: " << spatial_logging::options.iteration_logging_mod << std::endl;
         
         query_log.open(query_filename);
-        position_log.open(position_filename);
+        position_log.open(position_filename, std::ios::binary);
         std::cout << "saving queries to: " << query_filename << std::endl;
         
         if (!query_log.is_open() || !position_log.is_open()) {
@@ -39,6 +39,7 @@ namespace spatial_logging {
     }
 
     void log_iteration(int iter) {
+       return;  // Disable logging for iterations
         current_iteration = iter;
         if (iter % spatial_logging::options.iteration_logging_mod != 0) return;  // Only log every nth iteration
 
@@ -56,7 +57,7 @@ namespace spatial_logging {
         }
     }
 
-    void log_positions(const std::vector<std::vector<double>>& positions, const std::vector<double>& weights) {
+    void log_positions_non_binary(const std::vector<std::vector<double>>& positions, const std::vector<double>& weights) {
         if (current_iteration % spatial_logging::options.iteration_logging_mod != 0) return;  // Only log every nth iteration
 
         if (!position_log.is_open()) return;
@@ -76,6 +77,39 @@ namespace spatial_logging {
         if (!query_log.is_open()) return;
 
         query_log << "---\n";
+    }
+
+
+    void log_positions(const std::vector<std::vector<double>>& positions, const std::vector<double>& weights) {
+
+
+      if (current_iteration == 1) {
+        //LOG Binary  n and dim
+        if (!position_log.is_open()) return;
+        size_t n = positions.size();
+        size_t dim = positions.size() > 0 ? positions[0].size() : 0;
+        position_log.write(reinterpret_cast<const char*>(&n), sizeof(size_t));
+        position_log.write(reinterpret_cast<const char*>(&dim), sizeof(size_t));
+      }
+
+      if (current_iteration % spatial_logging::options.iteration_logging_mod != 0) return;
+      if (!position_log.is_open()) return;
+
+      // write iteration number
+      position_log.write(reinterpret_cast<const char*>(&current_iteration), sizeof(int));
+
+      // Write the number of rows and columns (assumes all rows have the same number of columns)
+      size_t rows = positions.size();
+      size_t cols = rows > 0 ? positions[0].size() : 0;
+      position_log.write(reinterpret_cast<const char*>(&rows), sizeof(size_t));
+      position_log.write(reinterpret_cast<const char*>(&cols), sizeof(size_t));
+
+      // Write the position data
+      for (const auto& row : positions) {
+        position_log.write(reinterpret_cast<const char*>(row.data()), sizeof(double) * row.size());
+      }
+
+      position_log.flush();
     }
 
     void log_query_nearest(CVecRef point, unsigned int k) {
