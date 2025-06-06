@@ -49,14 +49,14 @@ void log_iteration(int iter) {
 
     std::cout << "Iter % " << options.iteration_logging_mod << " == 0" << std::endl;
 
-    if (query_log.is_open()) {
-        query_log << "ITERATION " << iter << "\n";
-        query_log.flush();
-    }
-    if (position_log.is_open()) {
-        position_log << "ITERATION " << iter << "\n";
-        position_log.flush();
-    }
+    // if (query_log.is_open()) {
+    //     query_log << "ITERATION " << iter << "\n";
+    //     query_log.flush();
+    // }
+    // if (position_log.is_open()) {
+    //     position_log << "ITERATION " << iter << "\n";
+    //     position_log.flush();
+    // }
 }
 
 void log_positions_non_binary(const std::vector<std::vector<double>>& positions, const std::vector<double>& weights) {
@@ -83,11 +83,17 @@ void log_positions_non_binary(const std::vector<std::vector<double>>& positions,
 }
 
 void log_positions(const std::vector<std::vector<double>>& positions, const std::vector<double>& weights) {
-    if (current_iteration == 1) {
+
+    if (current_iteration == 0) {
         // LOG Binary  n and dim
         if (!position_log.is_open()) return;
         uint64_t n = positions.size();
         uint64_t dim = positions.size() > 0 ? positions[0].size() : 0;
+
+        // Debug: print the actual bytes being written
+        unsigned char* n_bytes = reinterpret_cast<unsigned char*>(&n);
+        unsigned char* dim_bytes = reinterpret_cast<unsigned char*>(&dim);
+
         position_log.write(reinterpret_cast<const char*>(&n), sizeof(uint64_t));
         position_log.write(reinterpret_cast<const char*>(&dim), sizeof(uint64_t));
     }
@@ -96,6 +102,7 @@ void log_positions(const std::vector<std::vector<double>>& positions, const std:
     // write iteration number
     uint64_t iteration = static_cast<uint64_t>(current_iteration);
     position_log.write(reinterpret_cast<const char*>(&iteration), sizeof(uint64_t));
+    current_iteration += 1;
 
     // Write the position data
     for (const auto& row : positions) {
